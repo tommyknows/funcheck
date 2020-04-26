@@ -7,9 +7,9 @@ steps:
     image: l.gcr.io/google/bazel:latest
     volumes:
       - name: cache
-        path: /todo
+        path: /cache
     commands:
-      - echo "build --disk-cache=/cache" >> .bazelrc
+      - echo "build --disk_cache=/cache" >> .bazelrc
       - bazel test //...
 
 volumes:
