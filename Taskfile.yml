@@ -1,0 +1,13 @@
+version: '2'
+
+tasks:
+  build:
+    cmds:
+      - bazel build $(bazel query 'kind(go_binary, //...)')
+  test:
+    cmds:
+      - bazel test //...
+  default:
+    cmds:
+      - task: test
+      - task: build

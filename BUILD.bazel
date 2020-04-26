@@ -1,0 +1,4 @@
+load("@bazel_gazelle//:def.bzl", "gazelle")
+
+# gazelle:prefix git.ramonr.ch/ramon/bachelor/work/funcheck
+gazelle(name = "gazelle")
