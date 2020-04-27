@@ -1,12 +1,15 @@
 version: '2'
 
+vars:
+  BZL_OPTS: "--color=yes --curses=yes"
+
 tasks:
   build:
     cmds:
-      - bazel build $(bazel query 'kind(go_binary, //...)')
+      - bazel build {{.BZL_OPTS}} $(bazel query 'kind(go_binary, //...)')
   test:
     cmds:
-      - bazel test //...
+      - bazel test {{.BZL_OPTS}} //...
   default:
     cmds:
       - task: test
