@@ -1,7 +1,7 @@
 package main
 
 import (
-	"git.ramonr.ch/ramon/bachelor/work/funcheck/assigncheck"
+	"github.com/tommyknows/funcheck/assigncheck"
 	"golang.org/x/tools/go/analysis/singlechecker"
 )
 

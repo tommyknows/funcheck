@@ -1,4 +1,4 @@
-module git.ramonr.ch/ramon/bachelor/work/funcheck
+module github.com/tommyknows/funcheck
 
 go 1.14
 
