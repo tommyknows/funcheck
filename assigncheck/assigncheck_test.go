@@ -1,7 +1,11 @@
 package assigncheck
 
-import "testing"
+import (
+	"testing"
+
+	"golang.org/x/tools/go/analysis/analysistest"
+)
 
 func TestRun(t *testing.T) {
-	// TODO
+	analysistest.Run(t, analysistest.TestData(), Analyzer)
 }
