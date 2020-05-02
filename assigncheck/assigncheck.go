@@ -18,19 +18,67 @@ var Analyzer = &analysis.Analyzer{
 
 func run(pass *analysis.Pass) (interface{}, error) {
 	for _, file := range pass.Files {
+		var lastNodeFuncDeclName string
 		ast.Inspect(file, func(n ast.Node) bool {
 			switch as := n.(type) {
+			// check if we found the declaration of a function,
+			// and store its name if so. This is needed to have
+			// recursive anonymous function, see comment below.
+			case *ast.DeclStmt:
+				decl, ok := as.Decl.(*ast.GenDecl)
+				if !ok {
+					return true
+				}
+
+				val, ok := decl.Specs[0].(*ast.ValueSpec)
+				if !ok {
+					return true
+				}
+				if val.Values != nil {
+					return true
+				}
+
+				_, ok = val.Type.(*ast.FuncType)
+				if !ok {
+					return true
+				}
+
+				lastNodeFuncDeclName = val.Names[0].Name
+				return false
 			case *ast.AssignStmt:
+
 				// new variable defined
 				if as.Tok == token.DEFINE {
 					return true
 				}
 
-				// there is one exception to this rule:
-				// type assertions in the form x = x.(T),
-				// as these do not change the value of x
-				// at all.
-				if _, ok := as.Rhs[0].(*ast.TypeAssertExpr); ok {
+				// there are two exceptions to this rule:
+				// ONE: type assertions in the form x = x.(T),
+				//      as these do not change the value of x.
+				// TWO: function assignments if it was just
+				//      recently declared. Anonymous functions
+				//      cannot be called recursively if they
+				//      are not in scope yet. This means that
+				//      to call an anonymous function, the
+				//      following pattern is always needed:
+				//        var x func(int) string
+				//        x = func(int) string { ... x(int) }
+				//      To ignore that, whenever a "var x func"
+				//      is seen, we save that identifier until
+				//      the next node.
+				switch as.Rhs[0].(type) {
+				case *ast.TypeAssertExpr:
+					return true
+				case *ast.FuncLit:
+					expr := as.Lhs[0].(*ast.Ident)
+					if expr.Name == lastNodeFuncDeclName {
+						lastNodeFuncDeclName = ""
+						return true
+					}
+				}
+
+				// ignore blank identifiers
+				if i, ok := as.Lhs[0].(*ast.Ident); ok && i.Obj == nil {
 					return true
 				}
 
@@ -43,6 +91,8 @@ func run(pass *analysis.Pass) (interface{}, error) {
 					renderIncDec(pass.Fset, as.X),
 				)
 			}
+
+			lastNodeFuncDeclName = "" // reset the name, we just passed a node.
 			return true
 		})
 	}

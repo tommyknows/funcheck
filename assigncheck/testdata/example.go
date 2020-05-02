@@ -49,8 +49,44 @@ func Loop() {
 	for x := 0; x < 5; x++ { // want `inline re-assignment of x`
 		fmt.Println(x)
 	}
+
+	_ = "hello"
+	_ = "world" // blank ident should be ignored
 }
 
 func test() string {
 	return "hello"
+}
+
+func AnonFuncDecl() {
+	var f func(i int) int
+	f = func(i int) int {
+		if i == 0 {
+			return -1
+		}
+		return f(i - 1)
+	}
+
+	var g func(int) int = func(x int) int {
+		return f(x)
+	}
+
+	fmt.Println(g(3))
+
+	var h func(int) int
+	x := 5
+	// this should be invalid as there are statements in between
+	h = func(i int) int { // want `re-assignment of h`
+		return i + x
+	}
+
+	fmt.Println(h(x))
+
+	var f2 func(int) int
+	// this should be valid as there are only comments in between
+	f2 = func(i int) int {
+		return i + x
+	}
+
+	fmt.Println(f2(x))
 }
