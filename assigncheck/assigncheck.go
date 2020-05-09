@@ -25,36 +25,15 @@ func run(pass *analysis.Pass) (interface{}, error) {
 		//   var x func(int) string
 		//   x = func(int) string { ... x(int) }
 		// To ignore that, whenever a "var x func" is encountered, we
-		//save that position until the next node.
+		// save that position until the next node.
 		var lastFuncDecl token.Pos
 
 		ast.Inspect(file, func(n ast.Node) bool {
 			switch as := n.(type) {
-			// check if we found the declaration of a function,
-			// and store its name if so. This is needed to have
-			// recursive anonymous function, see comment below.
 			case *ast.DeclStmt:
-				decl, ok := as.Decl.(*ast.GenDecl)
-				if !ok {
-					return true
-				}
+				lastFuncDecl = functionPos(as)
+				return false // important to return, as we'd reset the position if not
 
-				val, ok := decl.Specs[0].(*ast.ValueSpec)
-				if !ok {
-					return true
-				}
-				if val.Values != nil {
-					return true
-				}
-
-				_, ok = val.Type.(*ast.FuncType)
-				if !ok {
-					return true
-				}
-
-				lastFuncDecl = val.Pos()
-				// important to return, as we'd reset the position if not
-				return false
 			case *ast.AssignStmt:
 				for _, i := range identReassigned(as, lastFuncDecl) {
 					pass.Reportf(as.Pos(), "re-assignment of %s", i)
@@ -66,7 +45,6 @@ func run(pass *analysis.Pass) (interface{}, error) {
 				)
 			}
 
-			//lastNodeFuncDeclName = "" // reset the name, we just passed a node.
 			lastFuncDecl = token.NoPos
 			return true
 		})
@@ -129,6 +107,32 @@ func identReassigned(as *ast.AssignStmt, lastFuncPos token.Pos) []*ast.Ident {
 	}
 
 	return reassigned
+}
+
+// functionPos returns the position of the function
+// declaration, if the DeclStmt is a function declaration
+// at all. If not, token.NoPos is returned.
+func functionPos(as *ast.DeclStmt) (pos token.Pos) {
+	decl, ok := as.Decl.(*ast.GenDecl)
+	if !ok {
+		return
+	}
+
+	val, ok := decl.Specs[0].(*ast.ValueSpec)
+	if !ok {
+		return
+	}
+
+	if val.Values != nil {
+		return
+	}
+
+	_, ok = val.Type.(*ast.FuncType)
+	if !ok {
+		return
+	}
+
+	return val.Pos()
 }
 
 func renderIncDec(fset *token.FileSet, x ast.Expr) string {

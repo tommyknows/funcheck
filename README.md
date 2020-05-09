@@ -10,9 +10,9 @@ and background.
 
 Currently, there is one exception to the above rule:
 
-- Anonymous function assignments. As it is not possible (because of scoping rules)
-  to recursively call an anonymous function without declaring it first, this needed
-  to be an exception. The following code block is not valid Go:
+Anonymous function assignments. As it is not possible (because of scoping rules)
+to recursively call an anonymous function without declaring it first, this needed
+to be an exception. The following code block is not valid Go:
 
 ```go
 func x() {
