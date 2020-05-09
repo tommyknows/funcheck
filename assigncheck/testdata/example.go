@@ -19,7 +19,17 @@ func Fn2() {
 	fmt.Println(x)
 	x += 5 // want `re-assignment of x`
 	fmt.Println(x)
-	x -= 5 // want `re-assignment of x`
+	x -= 5  // want `re-assignment of x`
+	x *= 3  // want `re-assignment of x`
+	x /= 3  // want `re-assignment of x`
+	x %= 3  // want `re-assignment of x`
+	x &= 3  // want `re-assignment of x`
+	x |= 3  // want `re-assignment of x`
+	x ^= 3  // want `re-assignment of x`
+	x <<= 3 // want `re-assignment of x`
+	x >>= 3 // want `re-assignment of x`
+	x &^= 3 // want `re-assignment of x`
+
 	fmt.Println(x)
 	{ // separate block, re-declaration / shadowing
 		x := 5
@@ -29,12 +39,10 @@ func Fn2() {
 	type X interface{}
 	var z X = 5
 	fmt.Println(z)
-	var ok bool
 	// this is okay as we basically only
 	// "ensure" that z has the type int,
 	// no conversion or change is made.
-	z, ok = z.(int)
-	if !ok {
+	if _, ok := z.(int); !ok {
 		fmt.Println("error")
 	}
 	fmt.Println(z)

@@ -52,26 +52,20 @@ func run(pass *analysis.Pass) (interface{}, error) {
 					return true
 				}
 
-				// there are two exceptions to this rule:
-				// ONE: type assertions in the form x = x.(T),
-				//      as these do not change the value of x.
-				// TWO: function assignments if it was just
-				//      recently declared. Anonymous functions
-				//      cannot be called recursively if they
-				//      are not in scope yet. This means that
-				//      to call an anonymous function, the
-				//      following pattern is always needed:
-				//        var x func(int) string
-				//        x = func(int) string { ... x(int) }
-				//      To ignore that, whenever a "var x func"
-				//      is seen, we save that identifier until
-				//      the next node.
-				switch as.Rhs[0].(type) {
-				case *ast.TypeAssertExpr:
-					return true
-				case *ast.FuncLit:
-					expr := as.Lhs[0].(*ast.Ident)
-					if expr.Name == lastNodeFuncDeclName {
+				// there is one exception to this rule:
+				// function assignments if it was just
+				// recently declared. Anonymous functions
+				// cannot be called recursively if they
+				// are not in scope yet. This means that
+				// to call an anonymous function, the
+				// following pattern is always needed:
+				//   var x func(int) string
+				//   x = func(int) string { ... x(int) }
+				// To ignore that, whenever a "var x func"
+				// is seen, we save that identifier until
+				// the next node.
+				if _, ok := as.Rhs[0].(*ast.FuncLit); ok {
+					if as.Lhs[0].(*ast.Ident).Name == lastNodeFuncDeclName {
 						lastNodeFuncDeclName = ""
 						return true
 					}
