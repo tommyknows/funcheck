@@ -2,7 +2,6 @@ package assigncheck
 
 import (
 	"bytes"
-	"fmt"
 	"go/ast"
 	"go/printer"
 	"go/token"
@@ -18,7 +17,17 @@ var Analyzer = &analysis.Analyzer{
 
 func run(pass *analysis.Pass) (interface{}, error) {
 	for _, file := range pass.Files {
-		var lastNodeFuncDeclName string
+		// function assignments, if that function was just recently
+		// declared, should be allowed. Anonymous functions cannot be
+		// called recursively if they are not in scope yet. This means
+		// that to call an anonymous function, the following pattern
+		// is always needed:
+		//   var x func(int) string
+		//   x = func(int) string { ... x(int) }
+		// To ignore that, whenever a "var x func" is encountered, we
+		//save that position until the next node.
+		var lastFuncDecl token.Pos
+
 		ast.Inspect(file, func(n ast.Node) bool {
 			switch as := n.(type) {
 			// check if we found the declaration of a function,
@@ -43,42 +52,13 @@ func run(pass *analysis.Pass) (interface{}, error) {
 					return true
 				}
 
-				lastNodeFuncDeclName = val.Names[0].Name
+				lastFuncDecl = val.Pos()
+				// important to return, as we'd reset the position if not
 				return false
 			case *ast.AssignStmt:
-
-				// new variable defined
-				if as.Tok == token.DEFINE {
-					return true
+				for _, i := range identReassigned(as, lastFuncDecl) {
+					pass.Reportf(as.Pos(), "re-assignment of %s", i)
 				}
-
-				// there is one exception to this rule:
-				// function assignments if it was just
-				// recently declared. Anonymous functions
-				// cannot be called recursively if they
-				// are not in scope yet. This means that
-				// to call an anonymous function, the
-				// following pattern is always needed:
-				//   var x func(int) string
-				//   x = func(int) string { ... x(int) }
-				// To ignore that, whenever a "var x func"
-				// is seen, we save that identifier until
-				// the next node.
-				if _, ok := as.Rhs[0].(*ast.FuncLit); ok {
-					if as.Lhs[0].(*ast.Ident).Name == lastNodeFuncDeclName {
-						lastNodeFuncDeclName = ""
-						return true
-					}
-				}
-
-				// ignore blank identifiers
-				if i, ok := as.Lhs[0].(*ast.Ident); ok && i.Obj == nil {
-					return true
-				}
-
-				pass.Reportf(as.Pos(), "re-assignment of %s",
-					renderExpressions(pass.Fset, as.Lhs),
-				)
 
 			case *ast.IncDecStmt:
 				pass.Reportf(as.Pos(), "inline re-assignment of %s",
@@ -86,7 +66,8 @@ func run(pass *analysis.Pass) (interface{}, error) {
 				)
 			}
 
-			lastNodeFuncDeclName = "" // reset the name, we just passed a node.
+			//lastNodeFuncDeclName = "" // reset the name, we just passed a node.
+			lastFuncDecl = token.NoPos
 			return true
 		})
 	}
@@ -94,21 +75,60 @@ func run(pass *analysis.Pass) (interface{}, error) {
 	return nil, nil
 }
 
-// renderExpressions returns the pretty-print of multiple expressions.
-// For example, the left-handside of an assigment
-//   x, y := 0, 0
-// is returned as "x, y"
-func renderExpressions(fset *token.FileSet, x []ast.Expr) string {
-	var buf bytes.Buffer
-	for i, e := range x {
-		if err := printer.Fprint(&buf, fset, e); err != nil {
-			panic(err)
+// identReassigned returns all identifiers in an assignment
+// that are being reassigned. This is done by checking that the
+// assignment of all identifiers is at the position of the first
+// identifier.
+// There are two exceptions to this rule:
+// - Blank identifiers are ignored
+// - Functions may be redeclared if the assignment position is
+//   the lastFuncPos
+func identReassigned(as *ast.AssignStmt, lastFuncPos token.Pos) []*ast.Ident {
+	type pos interface {
+		Pos() token.Pos
+	}
+
+	var reassigned []*ast.Ident
+
+	var expectedAssignPos token.Pos
+	for i, expr := range as.Lhs {
+		ident := expr.(*ast.Ident) // Lhs always is an "IdentifierList"
+
+		// skip blank identifiers
+		if ident.Obj == nil {
+			continue
 		}
-		if !(len(x)-1 == i) {
-			fmt.Fprintf(&buf, ", ")
+
+		// make sure the declaration has a Pos func and get it
+		declPos := ident.Obj.Decl.(pos).Pos()
+
+		// if we got a function position and the corresponding
+		// Rhs expression is a function literal, check that the
+		// positions match (=same declaration)
+		if lastFuncPos != token.NoPos && len(as.Rhs) > i {
+			if _, ok := as.Rhs[i].(*ast.FuncLit); ok {
+				if declPos != lastFuncPos {
+					reassigned = append(reassigned, ident)
+				}
+				continue
+			}
+		}
+
+		// we expect all assignments to be at the same position
+		// as the first identifier.
+		// paired with the below if condition, this bascially
+		// ensures that the first identifier's assignment is
+		// at the same position as the identifier itself.
+		if expectedAssignPos == token.NoPos {
+			expectedAssignPos = ident.Pos()
+		}
+
+		if declPos != expectedAssignPos {
+			reassigned = append(reassigned, ident)
 		}
 	}
-	return buf.String()
+
+	return reassigned
 }
 
 func renderIncDec(fset *token.FileSet, x ast.Expr) string {

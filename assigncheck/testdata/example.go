@@ -2,59 +2,77 @@ package pkg
 
 import "fmt"
 
-func Fn() {
-	x := 5
-	fmt.Println(x)
-	x = 6 // want `re-assignment of x`
-	fmt.Println(x)
-}
-
 func Fn2() {
-	x, y := 5, 6
-	fmt.Println(x, y)
-	x, y = 6, x // want `re-assignment of x, y`
-	fmt.Println(x, y)
-
-	x++ // want `inline re-assignment of x`
-	fmt.Println(x)
-	x += 5 // want `re-assignment of x`
-	fmt.Println(x)
-	x -= 5  // want `re-assignment of x`
-	x *= 3  // want `re-assignment of x`
-	x /= 3  // want `re-assignment of x`
-	x %= 3  // want `re-assignment of x`
-	x &= 3  // want `re-assignment of x`
-	x |= 3  // want `re-assignment of x`
-	x ^= 3  // want `re-assignment of x`
-	x <<= 3 // want `re-assignment of x`
-	x >>= 3 // want `re-assignment of x`
-	x &^= 3 // want `re-assignment of x`
-
-	fmt.Println(x)
-	{ // separate block, re-declaration / shadowing
+	{
 		x := 5
 		fmt.Println(x)
+		x = 6 // want `^re-assignment of x$`
+		fmt.Println(x)
 	}
+	{
+		x, y := 5, 6
+		x, y = 6, x  // want `^re-assignment of x$` `^re-assignment of y$`
+		x, z := 5, 6 // want `^re-assignment of x$`
+		a, x := 5, 6 // want `^re-assignment of x$`
+		fmt.Println(a, x, y, z)
 
-	type X interface{}
-	var z X = 5
-	fmt.Println(z)
-	// this is okay as we basically only
-	// "ensure" that z has the type int,
-	// no conversion or change is made.
-	if _, ok := z.(int); !ok {
-		fmt.Println("error")
+		x++     // want `inline re-assignment of x`
+		x += 5  // want `^re-assignment of x$`
+		x -= 5  // want `^re-assignment of x$`
+		x *= 3  // want `^re-assignment of x$`
+		x /= 3  // want `^re-assignment of x$`
+		x %= 3  // want `^re-assignment of x$`
+		x &= 3  // want `^re-assignment of x$`
+		x |= 3  // want `^re-assignment of x$`
+		x ^= 3  // want `^re-assignment of x$`
+		x <<= 3 // want `^re-assignment of x$`
+		x >>= 3 // want `^re-assignment of x$`
+		x &^= 3 // want `^re-assignment of x$`
+		fmt.Println(x)
 	}
-	fmt.Println(z)
-
-	s := test()
-	fmt.Println(s)
-	s = test() // want `re-assignment of s`
-	fmt.Println(s)
+	{
+		var x int
+		{
+			x = 2  // want `^re-assignment of x$`
+			x := 5 // separate block, re-declaration introduces shadowing
+			fmt.Println(x)
+		}
+		fmt.Println(x)
+	}
+	{
+		type X interface{}
+		var z X = 5
+		fmt.Println(z)
+		if _, ok := z.(int); !ok {
+			fmt.Println("error")
+		}
+		fmt.Println(z)
+	}
+	{
+		s := test()
+		s = test() // want `^re-assignment of s$`
+		fmt.Println(s)
+	}
+	{
+		var f func()
+		x, f := 3, func() {
+			f()
+		}
+		fmt.Println(x)
+	}
+	{
+		x, f := 3, func() {}
+		fmt.Println(x, f)
+	}
+	{
+		var f func()
+		x, f, y := 3, func() {}, 4
+		fmt.Println(x, y, f)
+	}
 }
 
 func Loop() {
-	for x := 0; x < 5; x++ { // want `inline re-assignment of x`
+	for x := 0; x < 5; x++ { // want `^inline re-assignment of x$`
 		fmt.Println(x)
 	}
 
@@ -84,7 +102,7 @@ func AnonFuncDecl() {
 	var h func(int) int
 	x := 5
 	// this should be invalid as there are statements in between
-	h = func(i int) int { // want `re-assignment of h`
+	h = func(i int) int { // want `^re-assignment of h$`
 		return i + x
 	}
 
