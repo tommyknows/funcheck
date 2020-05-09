@@ -8,10 +8,8 @@ assign variables (`x = "whatever"`), not combined by a declaration (`x := "whate
 See [my Bachelor thesis](https://github.com/tommyknows/bachelor) for more info
 and background.
 
-Currently, there are two exceptions to the above rule:
+Currently, there is one exception to the above rule:
 
-- Type Assertions: `x = x.(<type>)`. This is because it doesn't actually change the
-  underlying value, but only assures that it has the specified type.
 - Anonymous function assignments. As it is not possible (because of scoping rules)
   to recursively call an anonymous function without declaring it first, this needed
   to be an exception. The following code block is not valid Go:
