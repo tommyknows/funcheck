@@ -1,9 +1,7 @@
 package assigncheck
 
 import (
-	"bytes"
 	"go/ast"
-	"go/printer"
 	"go/token"
 
 	"golang.org/x/tools/go/analysis"
@@ -40,9 +38,7 @@ func run(pass *analysis.Pass) (interface{}, error) {
 				}
 
 			case *ast.IncDecStmt:
-				pass.Reportf(as.Pos(), "inline re-assignment of %s",
-					renderIncDec(pass.Fset, as.X),
-				)
+				pass.Reportf(as.Pos(), "inline re-assignment of %s", as.X)
 			}
 
 			lastFuncDecl = token.NoPos
@@ -133,12 +129,4 @@ func functionPos(as *ast.DeclStmt) (pos token.Pos) {
 	}
 
 	return val.Pos()
-}
-
-func renderIncDec(fset *token.FileSet, x ast.Expr) string {
-	var buf bytes.Buffer
-	if err := printer.Fprint(&buf, fset, x); err != nil {
-		panic(err)
-	}
-	return buf.String()
 }
