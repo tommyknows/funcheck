@@ -1,8 +1,11 @@
 package pkg
 
-import "fmt"
+import (
+	"encoding/base64"
+	"fmt"
+)
 
-func Fn2() {
+func Test() {
 	{ // simplest case
 		x := 5
 		fmt.Println(x)
@@ -38,6 +41,11 @@ func Fn2() {
 			fmt.Println(x)
 		}
 		fmt.Println(x)
+	}
+	{ // inline assignment
+		if r := recover(); r != nil {
+			fmt.Println("recoverd", r)
+		}
 	}
 	{ // type assertions
 		type X interface{}
@@ -128,6 +136,21 @@ func Fn2() {
 		)
 		f = func() int { return x }
 		f()
+	}
+	{ // variable declared in different file
+		declaredInDifferentFile = 5 // want `^re-assignment of declaredInDifferentFile$`
+		fmt.Println(declaredInDifferentFile)
+	}
+	{ // variable declared in different package
+		base64.StdEncoding = base64.NewEncoding("") // want `^re-assignment of base64.StdEncoding$`
+	}
+	{ // map and slice access
+		m := map[string]string{
+			"hello": "world",
+		}
+		m["test"] = "no" // want `^re-assignment of m\["test"\]$`
+		s := []int{1, 2, 3}
+		s[0] = 2 // want `^re-assignment of s\[0\]$`
 	}
 }
 

@@ -20,6 +20,30 @@ func run(pass *analysis.Pass) (interface{}, error) {
 	for _, file := range pass.Files {
 		ast.Inspect(file, func(n ast.Node) bool {
 			switch as := n.(type) {
+			case *ast.DeclStmt:
+				fmt.Printf("Declaration %q: %v\n", render(pass.Fset, as), as.Pos())
+				decl, ok := as.Decl.(*ast.GenDecl)
+				if !ok {
+					break
+				}
+
+				for i := range decl.Specs {
+					val, ok := decl.Specs[i].(*ast.ValueSpec)
+					if !ok {
+						continue
+					}
+
+					if val.Values != nil {
+						continue
+					}
+
+					_, ok = val.Type.(*ast.FuncType)
+					if !ok {
+						continue
+					}
+
+					fmt.Printf("\tIdent %q: %v\n", render(pass.Fset, val), val.Names[0].Pos())
+				}
 			case *ast.AssignStmt:
 				type pos interface {
 					Pos() token.Pos
@@ -33,7 +57,13 @@ func run(pass *analysis.Pass) (interface{}, error) {
 					fmt.Printf("\tIdent %q: %v\n", ident.String(), ident.Pos())
 
 					// skip blank identifiers
+					if ident.Name == "_" {
+						fmt.Printf("\t\tBlank Identifier!\n")
+						continue
+					}
+
 					if ident.Obj == nil {
+						fmt.Printf("\t\tDecl is not in the same file!\n")
 						continue
 					}
 

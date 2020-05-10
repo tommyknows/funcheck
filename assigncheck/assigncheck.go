@@ -1,7 +1,9 @@
 package assigncheck
 
 import (
+	"bytes"
 	"go/ast"
+	"go/printer"
 	"go/token"
 
 	"golang.org/x/tools/go/analysis"
@@ -33,12 +35,12 @@ func run(pass *analysis.Pass) (interface{}, error) {
 				return false // important to return, as we'd reset the position if not
 
 			case *ast.AssignStmt:
-				for _, i := range identReassigned(as, lastFuncDecl) {
-					pass.Reportf(as.Pos(), "re-assignment of %s", i)
+				for _, i := range exprReassigned(as, lastFuncDecl) {
+					pass.Reportf(as.Pos(), "re-assignment of %s", render(pass.Fset, i))
 				}
 
 			case *ast.IncDecStmt:
-				pass.Reportf(as.Pos(), "inline re-assignment of %s", as.X)
+				pass.Reportf(as.Pos(), "inline re-assignment of %s", render(pass.Fset, as.X))
 			}
 
 			lastFuncDecl = token.NoPos
@@ -49,27 +51,44 @@ func run(pass *analysis.Pass) (interface{}, error) {
 	return nil, nil
 }
 
-// identReassigned returns all identifiers in an assignment
+const blankIdent = "_"
+
+// exprReassigned returns all expressions in an assignment
 // that are being reassigned. This is done by checking that the
 // assignment of all identifiers is at the position of the first
-// identifier.
+// identifier. If it is not an identifier, it must be a reassignment.
 // There are two exceptions to this rule:
 // - Blank identifiers are ignored
-// - Functions may be redeclared if the assignment position is
-//   the lastFuncPos
-func identReassigned(as *ast.AssignStmt, lastFuncPos token.Pos) []*ast.Ident {
+// - Functions may be redeclared if the assignment position is the lastFuncPos
+func exprReassigned(as *ast.AssignStmt, lastFuncPos token.Pos) (reassigned []ast.Expr) {
 	type pos interface {
 		Pos() token.Pos
 	}
 
-	var reassigned []*ast.Ident
-
 	var expectedAssignPos token.Pos
+
 	for i, expr := range as.Lhs {
-		ident := expr.(*ast.Ident) // Lhs always is an "IdentifierList"
+		ident, ok := expr.(*ast.Ident)
+		if !ok { // if it's not an identifier, it is always reassigned.
+			reassigned = append(reassigned, expr)
+			continue
+		}
+
+		// we expect all assignments to be at the same position
+		// as the first identifier.
+		if expectedAssignPos == token.NoPos {
+			expectedAssignPos = ident.Pos()
+		}
 
 		// skip blank identifiers
+		if ident.Name == blankIdent {
+			continue
+		}
+
+		// no object probably means that the variable has been declared
+		// in a separate file, making this a reassignment.
 		if ident.Obj == nil {
+			reassigned = append(reassigned, ident)
 			continue
 		}
 
@@ -88,15 +107,6 @@ func identReassigned(as *ast.AssignStmt, lastFuncPos token.Pos) []*ast.Ident {
 				}
 				continue
 			}
-		}
-
-		// we expect all assignments to be at the same position
-		// as the first identifier.
-		// paired with the below if condition, this bascially
-		// ensures that the first identifier's assignment is
-		// at the same position as the identifier itself.
-		if expectedAssignPos == token.NoPos {
-			expectedAssignPos = ident.Pos()
 		}
 
 		if declPos != expectedAssignPos {
@@ -144,4 +154,13 @@ func functionPos(as *ast.DeclStmt) token.Pos {
 		pos = val.Names[0].Pos()
 	}
 	return pos
+}
+
+// render returns the pretty-print of the given node
+func render(fset *token.FileSet, x interface{}) string {
+	var buf bytes.Buffer
+	if err := printer.Fprint(&buf, fset, x); err != nil {
+		panic(err)
+	}
+	return buf.String()
 }
