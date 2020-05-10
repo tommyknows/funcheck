@@ -81,7 +81,9 @@ func identReassigned(as *ast.AssignStmt, lastFuncPos token.Pos) []*ast.Ident {
 		// positions match (=same declaration)
 		if lastFuncPos != token.NoPos && len(as.Rhs) > i {
 			if _, ok := as.Rhs[i].(*ast.FuncLit); ok {
-				if declPos != lastFuncPos {
+				// the function is either declared right here or on the last
+				// position that we got from the callee.
+				if declPos != lastFuncPos && declPos != ident.Pos() {
 					reassigned = append(reassigned, ident)
 				}
 				continue
@@ -106,27 +108,40 @@ func identReassigned(as *ast.AssignStmt, lastFuncPos token.Pos) []*ast.Ident {
 }
 
 // functionPos returns the position of the function
-// declaration, if the DeclStmt is a function declaration
+// declaration, if the DeclStmt has a function declaration
 // at all. If not, token.NoPos is returned.
-func functionPos(as *ast.DeclStmt) (pos token.Pos) {
+// At most, one position (the position of the last function
+// declaration) is returned
+func functionPos(as *ast.DeclStmt) token.Pos {
 	decl, ok := as.Decl.(*ast.GenDecl)
 	if !ok {
-		return
+		return token.NoPos
 	}
 
-	val, ok := decl.Specs[0].(*ast.ValueSpec)
-	if !ok {
-		return
-	}
+	var pos token.Pos
 
-	if val.Values != nil {
-		return
-	}
+	// iterate over all variable specs to fetch
+	// the last function declaration. Skip all declarations
+	// that are not function literals.
+	for i := range decl.Specs {
+		val, ok := decl.Specs[i].(*ast.ValueSpec)
+		if !ok {
+			continue
+		}
 
-	_, ok = val.Type.(*ast.FuncType)
-	if !ok {
-		return
-	}
+		if val.Values != nil {
+			continue
+		}
 
-	return val.Pos()
+		_, ok = val.Type.(*ast.FuncType)
+		if !ok {
+			continue
+		}
+
+		// there may not be more than one function
+		// declaration mapped to a single type,
+		// so we just return the first one.
+		pos = val.Names[0].Pos()
+	}
+	return pos
 }
