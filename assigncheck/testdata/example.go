@@ -9,34 +9,34 @@ func Test() {
 	{ // simplest case
 		x := 5
 		fmt.Println(x)
-		x = 6 // want `^re-assignment of x$`
+		x = 6 // want `^reassignment of x$`
 		fmt.Println(x)
 	}
-	{ // more "normal" re-assignments
+	{ // more "normal" reassignments
 		x, y := 5, 6
-		x, y = 6, x  // want `^re-assignment of x$` `^re-assignment of y$`
-		x, z := 5, 6 // want `^re-assignment of x$`
-		a, x := 5, 6 // want `^re-assignment of x$`
+		x, y = 6, x  // want `^reassignment of x$` `^reassignment of y$`
+		x, z := 5, 6 // want `^reassignment of x$`
+		a, x := 5, 6 // want `^reassignment of x$`
 		fmt.Println(a, x, y, z)
 
-		x++     // want `inline re-assignment of x`
-		x += 5  // want `^re-assignment of x$`
-		x -= 5  // want `^re-assignment of x$`
-		x *= 3  // want `^re-assignment of x$`
-		x /= 3  // want `^re-assignment of x$`
-		x %= 3  // want `^re-assignment of x$`
-		x &= 3  // want `^re-assignment of x$`
-		x |= 3  // want `^re-assignment of x$`
-		x ^= 3  // want `^re-assignment of x$`
-		x <<= 3 // want `^re-assignment of x$`
-		x >>= 3 // want `^re-assignment of x$`
-		x &^= 3 // want `^re-assignment of x$`
+		x++     // want `inline reassignment of x`
+		x += 5  // want `^reassignment of x$`
+		x -= 5  // want `^reassignment of x$`
+		x *= 3  // want `^reassignment of x$`
+		x /= 3  // want `^reassignment of x$`
+		x %= 3  // want `^reassignment of x$`
+		x &= 3  // want `^reassignment of x$`
+		x |= 3  // want `^reassignment of x$`
+		x ^= 3  // want `^reassignment of x$`
+		x <<= 3 // want `^reassignment of x$`
+		x >>= 3 // want `^reassignment of x$`
+		x &^= 3 // want `^reassignment of x$`
 		fmt.Println(x)
 	}
 	{ // shadowing
 		var x int
 		{
-			x = 2  // want `^re-assignment of x$`
+			x = 2  // want `^reassignment of x$`
 			x := 5 // separate block, re-declaration introduces shadowing
 			fmt.Println(x)
 		}
@@ -54,11 +54,16 @@ func Test() {
 		if _, ok := z.(int); !ok {
 			fmt.Println("error")
 		}
+		var ok bool
+		_, ok = z.(int) // want `^reassignment of ok$`
+		if !ok {
+			fmt.Println("error")
+		}
 		fmt.Println(z)
 	}
 	{ // assignment of returned function values
 		s := test()
-		s = test() // want `^re-assignment of s$`
+		s = test() // want `^reassignment of s$`
 		fmt.Println(s)
 	}
 	{ // function literals paired with redeclarations
@@ -77,8 +82,8 @@ func Test() {
 		x, f, y := 3, func() {}, 4
 		fmt.Println(x, y, f)
 	}
-	{ // loops, inline re-assignment
-		for x := 0; x < 5; x++ { // want `^inline re-assignment of x$`
+	{ // loops, inline reassignment
+		for x := 0; x < 5; x++ { // want `internal reassignment \(for loop\) in "for x := 0; x < 5; x\+\+ { ... }` `inline reassignment`
 			fmt.Println(x)
 		}
 	}
@@ -104,7 +109,7 @@ func Test() {
 		var h func(int) int
 		x := 5
 		// this should be invalid as there are statements in between
-		h = func(i int) int { // want `^re-assignment of h$`
+		h = func(i int) int { // want `^reassignment of h$`
 			return i + x
 		}
 
@@ -121,11 +126,11 @@ func Test() {
 	{ // edge case function literals
 		var g func()
 		var f func()
-		g = func() { // want `^re-assignment of g$`
+		g = func() { // want `^reassignment of g$`
 			f()
 		}
 
-		f = func() {} // want `^re-assignment of f$`
+		f = func() {} // want `^reassignment of f$`
 
 		g()
 	}
@@ -138,19 +143,25 @@ func Test() {
 		f()
 	}
 	{ // variable declared in different file
-		declaredInDifferentFile = 5 // want `^re-assignment of declaredInDifferentFile$`
+		declaredInDifferentFile = 5 // want `^reassignment of declaredInDifferentFile$`
 		fmt.Println(declaredInDifferentFile)
 	}
 	{ // variable declared in different package
-		base64.StdEncoding = base64.NewEncoding("") // want `^re-assignment of base64.StdEncoding$`
+		base64.StdEncoding = base64.NewEncoding("") // want `^reassignment of base64.StdEncoding$`
 	}
 	{ // map and slice access
 		m := map[string]string{
 			"hello": "world",
 		}
-		m["test"] = "no" // want `^re-assignment of m\["test"\]$`
+		m["test"] = "no" // want `^reassignment of m\["test"\]$`
 		s := []int{1, 2, 3}
-		s[0] = 2 // want `^re-assignment of s\[0\]$`
+		s[0] = 2 // want `^reassignment of s\[0\]$`
+	}
+	{ // simple for loop
+		x := []int{1, 2, 3}
+		for i := range x { // want `^internal reassignment \(for loop\) in "for i := range x { ... }"$`
+			fmt.Println(i)
+		}
 	}
 }
 

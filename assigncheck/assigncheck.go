@@ -11,7 +11,7 @@ import (
 
 var Analyzer = &analysis.Analyzer{
 	Name: "assigncheck",
-	Doc:  "reports re-assignments",
+	Doc:  "reports reassignments",
 	Run:  run,
 }
 
@@ -30,17 +30,24 @@ func run(pass *analysis.Pass) (interface{}, error) {
 
 		ast.Inspect(file, func(n ast.Node) bool {
 			switch as := n.(type) {
+			case *ast.ForStmt:
+				pass.Reportf(as.Pos(), "internal reassignment (for loop) in %q", renderFor(pass.Fset, as))
+				return true
+			case *ast.RangeStmt:
+				pass.Reportf(as.Pos(), "internal reassignment (for loop) in %q", renderRange(pass.Fset, as))
+				return true
+
 			case *ast.DeclStmt:
 				lastFuncDecl = functionPos(as)
 				return false // important to return, as we'd reset the position if not
 
 			case *ast.AssignStmt:
 				for _, i := range exprReassigned(as, lastFuncDecl) {
-					pass.Reportf(as.Pos(), "re-assignment of %s", render(pass.Fset, i))
+					pass.Reportf(as.Pos(), "reassignment of %s", render(pass.Fset, i))
 				}
 
 			case *ast.IncDecStmt:
-				pass.Reportf(as.Pos(), "inline re-assignment of %s", render(pass.Fset, as.X))
+				pass.Reportf(as.Pos(), "inline reassignment of %s", render(pass.Fset, as.X))
 			}
 
 			lastFuncDecl = token.NoPos
@@ -49,6 +56,47 @@ func run(pass *analysis.Pass) (interface{}, error) {
 	}
 
 	return nil, nil
+}
+
+func renderFor(fset *token.FileSet, as *ast.ForStmt) string {
+	s := "for "
+	if as.Init == nil && as.Cond == nil && as.Post == nil {
+		return s + "{ ... }"
+	}
+
+	if as.Init == nil && as.Cond != nil && as.Post == nil {
+		return s + render(fset, as.Cond) + " { ... }"
+	}
+
+	if as.Init != nil {
+		s += render(fset, as.Init)
+	}
+	s += "; "
+	if as.Cond != nil {
+		s += render(fset, as.Cond)
+	}
+	s += "; "
+	if as.Post != nil {
+		s += render(fset, as.Post)
+	}
+
+	return s + " { ... }"
+}
+
+func renderRange(fset *token.FileSet, as *ast.RangeStmt) string {
+	s := "for "
+	switch {
+	case as.Key == nil && as.Value == nil:
+		// nothing
+	case as.Value == nil:
+		s += render(fset, as.Key) + " := "
+	case as.Key == nil:
+		s += "_, " + render(fset, as.Value) + " := "
+	default:
+		s += render(fset, as.Key) + ", " + render(fset, as.Value) + " := "
+	}
+	s += "range " + render(fset, as.X) + " { ... }"
+	return s
 }
 
 const blankIdent = "_"
