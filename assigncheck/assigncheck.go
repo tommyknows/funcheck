@@ -101,6 +101,24 @@ func renderRange(fset *token.FileSet, as *ast.RangeStmt) string {
 
 const blankIdent = "_"
 
+// isTestdeps returns true if the expression is the
+// testdeps.ImportPath selector. This selector is generated
+// as testing code and is not anything the programmer could
+// influence.
+func isTestdeps(expr ast.Expr) bool {
+	sel, ok := expr.(*ast.SelectorExpr)
+	if !ok {
+		return false
+	}
+
+	i, ok := sel.X.(*ast.Ident)
+	if !ok {
+		return false
+	}
+
+	return i.Name == "testdeps" && sel.Sel.Name == "ImportPath"
+}
+
 // exprReassigned returns all expressions in an assignment
 // that are being reassigned. This is done by checking that the
 // assignment of all identifiers is at the position of the first
@@ -118,7 +136,9 @@ func exprReassigned(as *ast.AssignStmt, lastFuncPos token.Pos) (reassigned []ast
 	for i, expr := range as.Lhs {
 		ident, ok := expr.(*ast.Ident)
 		if !ok { // if it's not an identifier, it is always reassigned.
-			reassigned = append(reassigned, expr)
+			if !isTestdeps(expr) { // ignore testdeps.ImportPath reassignment
+				reassigned = append(reassigned, expr)
+			}
 			continue
 		}
 
