@@ -21,61 +21,69 @@ func run(pass *analysis.Pass) (interface{}, error) {
 		ast.Inspect(file, func(n ast.Node) bool {
 			switch as := n.(type) {
 			case *ast.DeclStmt:
-				fmt.Printf("Declaration %q: %v\n", render(pass.Fset, as), as.Pos())
-				decl, ok := as.Decl.(*ast.GenDecl)
-				if !ok {
-					break
-				}
-
-				for i := range decl.Specs {
-					val, ok := decl.Specs[i].(*ast.ValueSpec)
-					if !ok {
-						continue
-					}
-
-					if val.Values != nil {
-						continue
-					}
-
-					if _, ok := val.Type.(*ast.FuncType); !ok {
-						continue
-					}
-
-					fmt.Printf("\tIdent %q: %v\n", render(pass.Fset, val), val.Names[0].Pos())
-				}
+				checkDecl(as, pass.Fset)
 			case *ast.AssignStmt:
-				type pos interface {
-					Pos() token.Pos
-				}
-
-				fmt.Printf("Assignment %q: %v\n", render(pass.Fset, as), as.Pos())
-
-				for _, expr := range as.Lhs {
-					ident := expr.(*ast.Ident) // Lhs always is an "IdentifierList"
-
-					fmt.Printf("\tIdent %q: %v\n", ident.String(), ident.Pos())
-
-					// skip blank identifiers
-					if ident.Name == "_" {
-						fmt.Printf("\t\tBlank Identifier!\n")
-						continue
-					}
-
-					if ident.Obj == nil {
-						fmt.Printf("\t\tDecl is not in the same file!\n")
-						continue
-					}
-
-					// make sure the declaration has a Pos func and get it
-					declPos := ident.Obj.Decl.(pos).Pos()
-					fmt.Printf("\t\tDecl %q: %v\n", render(pass.Fset, ident.Obj.Decl), declPos)
-				}
+				checkAssign(as, pass.Fset)
 			}
 			return true
 		})
 	}
 
 	return nil, nil
+}
+
+func checkDecl(as *ast.DeclStmt, fset *token.FileSet) {
+	fmt.Printf("Declaration %q: %v\n", render(fset, as), as.Pos())
+	decl, ok := as.Decl.(*ast.GenDecl)
+	if !ok {
+		return
+	}
+
+	for i := range decl.Specs {
+		val, ok := decl.Specs[i].(*ast.ValueSpec)
+		if !ok {
+			continue
+		}
+
+		if val.Values != nil {
+			continue
+		}
+
+		if _, ok := val.Type.(*ast.FuncType); !ok {
+			continue
+		}
+
+		fmt.Printf("\tIdent %q: %v\n", render(fset, val), val.Names[0].Pos())
+	}
+}
+
+func checkAssign(as *ast.AssignStmt, fset *token.FileSet) {
+	type pos interface {
+		Pos() token.Pos
+	}
+
+	fmt.Printf("Assignment %q: %v\n", render(fset, as), as.Pos())
+
+	for _, expr := range as.Lhs {
+		ident := expr.(*ast.Ident) // Lhs always is an "IdentifierList"
+
+		fmt.Printf("\tIdent %q: %v\n", ident.String(), ident.Pos())
+
+		// skip blank identifiers
+		if ident.Name == "_" {
+			fmt.Printf("\t\tBlank Identifier!\n")
+			continue
+		}
+
+		if ident.Obj == nil {
+			fmt.Printf("\t\tDecl is not in the same file!\n")
+			continue
+		}
+
+		// make sure the declaration has a Pos func and get it
+		declPos := ident.Obj.Decl.(pos).Pos()
+		fmt.Printf("\t\tDecl %q: %v\n", render(fset, ident.Obj.Decl), declPos)
+	}
 }
 
 // render returns the pretty-print of the given node

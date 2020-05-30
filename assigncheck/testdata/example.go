@@ -163,6 +163,11 @@ func Test() {
 			fmt.Println(i)
 		}
 	}
+	{ // allow forever loops
+		for {
+			fmt.Println("hello")
+		}
+	}
 }
 
 func test() string {

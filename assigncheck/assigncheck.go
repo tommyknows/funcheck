@@ -29,13 +29,21 @@ func run(pass *analysis.Pass) (interface{}, error) {
 		var lastFuncDecl token.Pos
 
 		ast.Inspect(file, func(n ast.Node) bool {
+			// start-basictypes
 			switch as := n.(type) {
 			case *ast.ForStmt:
-				pass.Reportf(as.Pos(), "internal reassignment (for loop) in %q", renderFor(pass.Fset, as))
+				// exception for `for { ... }`,
+				if as.Cond != nil || as.Init != nil || as.Post != nil {
+					pass.Reportf(as.Pos(), "internal reassignment (for loop) in %q", renderFor(pass.Fset, as))
+				}
 				return true
 			case *ast.RangeStmt:
 				pass.Reportf(as.Pos(), "internal reassignment (for loop) in %q", renderRange(pass.Fset, as))
 				return true
+
+			case *ast.IncDecStmt:
+				pass.Reportf(as.Pos(), "inline reassignment of %s", render(pass.Fset, as.X))
+			// end-basictypes
 
 			case *ast.DeclStmt:
 				lastFuncDecl = functionPos(as)
@@ -45,9 +53,6 @@ func run(pass *analysis.Pass) (interface{}, error) {
 				for _, i := range exprReassigned(as, lastFuncDecl) {
 					pass.Reportf(as.Pos(), "reassignment of %s", render(pass.Fset, i))
 				}
-
-			case *ast.IncDecStmt:
-				pass.Reportf(as.Pos(), "inline reassignment of %s", render(pass.Fset, as.X))
 			}
 
 			lastFuncDecl = token.NoPos
