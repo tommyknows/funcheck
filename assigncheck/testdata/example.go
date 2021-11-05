@@ -168,6 +168,11 @@ func Test() {
 			fmt.Println("hello")
 		}
 	}
+	{ // loop without a modification
+		for i := 3; i != 2; {
+			fmt.Println("hi")
+		}
+	}
 }
 
 func test() string {

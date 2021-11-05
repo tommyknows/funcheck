@@ -32,8 +32,11 @@ func run(pass *analysis.Pass) (interface{}, error) {
 			// start-basictypes
 			switch as := n.(type) {
 			case *ast.ForStmt:
-				// exception for `for { ... }`,
-				if as.Cond != nil || as.Init != nil || as.Post != nil {
+				// exception for all for loops that do not have a post-condition.
+				// a loop without a post-condition technically only makes sense if
+				// the variable could be mutated within the loop, which they can't
+				// either. But we're being correct here :-)
+				if as.Post != nil {
 					pass.Reportf(as.Pos(), "internal reassignment (for loop) in %q", renderFor(pass.Fset, as))
 				}
 				return true
