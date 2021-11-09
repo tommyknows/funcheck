@@ -83,7 +83,7 @@ func Test() {
 		fmt.Println(x, y, f)
 	}
 	{ // loops, inline reassignment
-		for x := 0; x < 5; x++ { // want `internal reassignment \(for loop\) in "for x := 0; x < 5; x\+\+ { ... }` `inline reassignment`
+		for x := 0; x < 5; x++ { // want `reassignment \(for loop\) in "for x := 0; x < 5; x\+\+ { ... }` `inline reassignment`
 			fmt.Println(x)
 		}
 	}
@@ -122,6 +122,13 @@ func Test() {
 		}
 
 		fmt.Println(f2(x))
+
+		var g1, g2 func()
+		g1, g2 = func() { g2() }, func() { g1() }
+
+		var h1 func()
+		var h2 func()
+		h1, h2 = func() { h2() }, func() { h1() } // want `^reassignment of h1$`
 	}
 	{ // edge case function literals
 		var g func()
@@ -133,6 +140,10 @@ func Test() {
 		f = func() {} // want `^reassignment of f$`
 
 		g()
+
+		var h1 func()
+		h1, h2 := func() { h1() }, func() { h1() }
+		h2()
 	}
 	{ // block variable definition
 		var (

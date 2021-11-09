@@ -29,7 +29,6 @@ func run(pass *analysis.Pass) (interface{}, error) {
 		var lastFuncDecl token.Pos
 
 		ast.Inspect(file, func(n ast.Node) bool {
-			// start-basictypes
 			switch as := n.(type) {
 			case *ast.ForStmt:
 				// exception for all for loops that do not have a post-condition.
@@ -37,7 +36,7 @@ func run(pass *analysis.Pass) (interface{}, error) {
 				// the variable could be mutated within the loop, which they can't
 				// either. But we're being correct here :-)
 				if as.Post != nil {
-					pass.Reportf(as.Pos(), "internal reassignment (for loop) in %q", renderFor(pass.Fset, as))
+					pass.Reportf(as.Pos(), "reassignment (for loop) in %q", renderFor(pass.Fset, as))
 				}
 				return true
 			case *ast.RangeStmt:
@@ -46,7 +45,6 @@ func run(pass *analysis.Pass) (interface{}, error) {
 
 			case *ast.IncDecStmt:
 				pass.Reportf(as.Pos(), "inline reassignment of %s", render(pass.Fset, as.X))
-			// end-basictypes
 
 			case *ast.DeclStmt:
 				lastFuncDecl = functionPos(as)
@@ -178,7 +176,7 @@ func exprReassigned(as *ast.AssignStmt, lastFuncPos token.Pos) (reassigned []ast
 			if _, ok := as.Rhs[i].(*ast.FuncLit); ok {
 				// the function is either declared right here or on the last
 				// position that we got from the callee.
-				if declPos != lastFuncPos && declPos != ident.Pos() {
+				if declPos != lastFuncPos && declPos != expectedAssignPos {
 					reassigned = append(reassigned, ident)
 				}
 				continue
